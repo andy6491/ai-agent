@@ -16,5 +16,5 @@ def get_file_content(working_directory, file_path):
             if max_check != "":
                 file_content_string = f'{file_content_string} [...File "{file_path}" truncated at 10000 characters]'
     except Exception as e:
-        return f"Error: error was found in {e}"
+        return f'Error: error was found in "{e}" file'
     return file_content_string
