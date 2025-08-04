@@ -1,5 +1,6 @@
 import os
 
+
 def get_files_info(working_directory, directory="."):
     abs_working_dir_path = os.path.abspath(working_directory)
     full_intended_path = os.path.join(working_directory, directory)
