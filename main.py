@@ -16,6 +16,7 @@ client = genai.Client(api_key=api_key)
 system_prompt = """
 You are a helpful AI coding agent.
 
+When a user's request implies needing to find a file or understand the project structure (e.g., asking about 'the calculator' without providing a specific file path), your first action MUST be to call the get_files_info tool always, Never ask for a file path.
 When a user asks a question or makes a request, you MUST respond with a function call, never just text. Use a function call for every operation-even if you're not sure what to do, pick the closest function. You can perform the following operations:
 
 - List files and directories
@@ -78,30 +79,45 @@ def main():
     messages = [
     types.Content(role="user", parts=[types.Part(text=sys.argv[1])]),
 ]
-    response = client.models.generate_content(
-        model='gemini-2.0-flash-001',
-        contents=messages,
-        config=types.GenerateContentConfig(tools=[available_functions],system_instruction=system_prompt)
+   
+    count = 0
+    while count < 21:
+        try:
+            response = client.models.generate_content(
+                model='gemini-2.0-flash-001',
+                contents=messages,
+                config=types.GenerateContentConfig(tools=[available_functions],system_instruction=system_prompt)
 )
+            for candidate in response.candidates:
+                messages.append(candidate.content)
 
-    if response.function_calls:
-        for call in response.function_calls:
-            function_call_result = call_function(call, verbose="--verbose" in sys.argv)
-            if hasattr(function_call_result, "parts") and hasattr(function_call_result.parts[0], "function_response") and hasattr(function_call_result.parts[0].function_response, "response") and len(function_call_result.parts) > 0:
-                if "--verbose" in sys.argv:
-                    print(f"-> {function_call_result.parts[0].function_response.response}")
+            if response.function_calls:
+                for call in response.function_calls:
+                    function_call_result = call_function(call, verbose="--verbose" in sys.argv)
+                    new_user_message = types.Content(
+                        role="user",
+                        parts=function_call_result.parts
+                )
+                    messages.append(new_user_message)
+                    if hasattr(function_call_result, "parts") and hasattr(function_call_result.parts[0], "function_response") and hasattr(function_call_result.parts[0].function_response, "response") and len(function_call_result.parts) > 0:
+                        if "--verbose" in sys.argv:
+                            print(f"-> {function_call_result.parts[0].function_response.response}")
+                    else:
+                        raise Exception("Function did not return the expected parts[0].function_response.response")
             else:
-                raise Exception("Function did not return the expected parts[0].function_response.response")
-    else:
-        print(response.text)
+                print(response.text)
+                break
+        except Exception as e:
+            print(f"An error occured: {e}")
+        count += 1
+    
     
     prompt = sys.argv[1]
     if "--verbose" in sys.argv:
         print(f"User prompt: {prompt}")
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
-    
-    
+        
 
 
 if __name__ == "__main__":
